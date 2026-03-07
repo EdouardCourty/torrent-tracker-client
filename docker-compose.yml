@@ -1,0 +1,6 @@
+services:
+  opentracker:
+    image: lednerb/opentracker-docker:latest
+    ports:
+      - "6969:6969/tcp"   # HTTP tracker
+      - "6969:6969/udp"   # UDP tracker

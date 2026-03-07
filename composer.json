@@ -1,12 +1,13 @@
 {
-    "name": "ecourty/kodi-nfo-parser",
-    "description": "A PHP library to parse and serialize Kodi NFO files (Movie, TvShow, Episode, Artist, Album, MusicVideo, MovieSet).",
+    "name": "ecourty/torrent-tracker-client",
+    "description": "A modern PHP 8.3+ library for communicating with BitTorrent trackers over HTTP (BEP 3) and UDP (BEP 15), supporting both announce and scrape operations.",
     "type": "library",
-    "keywords": ["kodi", "nfo", "parser", "serializer", "metadata", "media"],
+    "keywords": ["bittorrent", "tracker", "torrent", "http", "udp", "announce", "scrape", "bep3", "bep15"],
     "require": {
         "php": ">=8.3",
-        "ext-simplexml": "*",
-        "ext-libxml": "*"
+        "ext-sockets": "*",
+        "arokettu/bencode": "^4.0",
+        "symfony/http-client": "^8.0"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.71",
@@ -16,12 +17,12 @@
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "Ecourty\\KodiNfoParser\\": "src/"
+            "Ecourty\\TorrentTrackerClient\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Ecourty\\KodiNfoParser\\Tests\\": "tests/"
+            "Ecourty\\TorrentTrackerClient\\Tests\\": "tests/"
         }
     },
     "authors": [
@@ -32,8 +33,9 @@
         }
     ],
     "scripts": {
-        "test": "phpunit tests",
-        "test-unit": "phpunit tests/Unit/",
+        "test": "phpunit --testsuite Unit",
+        "test:functional": "phpunit --testsuite Functional",
+        "test:all": "phpunit",
         "phpstan": "phpstan analyse --memory-limit=-1",
         "cs-fix": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix . --config .php-cs-fixer.php",
         "cs-check": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix . --config .php-cs-fixer.php --dry-run --diff",

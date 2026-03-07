@@ -18,7 +18,8 @@ A standalone PHP 8.3+ library (`ecourty/torrent-tracker-client`) that provides a
 
 ```
 TrackerClient          → auto-detects http:// vs udp://, delegates to the right client
-src/Client/            → HttpTrackerClient (BEP 3) and UdpTrackerClient (BEP 15)
+src/Client/            → TrackerClientInterface, HttpTrackerClient (BEP 3), UdpTrackerClient (BEP 15)
+src/Transport/         → UdpTransport (raw socket I/O)
 src/Request/           → AnnounceRequest, ScrapeRequest (readonly DTOs)
 src/Response/          → AnnounceResponse, ScrapeResponse, PeerInfo, TorrentStats (readonly DTOs)
 src/Enum/              → AnnounceEvent, TrackerProtocol
@@ -28,13 +29,14 @@ src/Exception/         → TrackerException hierarchy
 ### Main Components
 
 - **`TrackerClient`** — public entry point. Parses the tracker URL, detects the protocol, instantiates and calls the appropriate client.
-- **`HttpTrackerClient`** — implements HTTP tracker announce (BEP 3) and scrape (BEP 48) using `file_get_contents` + bencode decoding.
-- **`UdpTrackerClient`** — implements UDP tracker protocol (BEP 15): connect handshake → announce or scrape via binary UDP datagrams.
+- **`HttpTrackerClient`** — implements `TrackerClientInterface`. HTTP tracker announce (BEP 3) and scrape (BEP 48) via `symfony/http-client`. Accepts an optional `HttpClientInterface` in its constructor for injection.
+- **`UdpTrackerClient`** — implements `TrackerClientInterface`. Pure BEP 15 protocol logic: connect handshake, announce, scrape packet building and parsing. Delegates all socket I/O to `UdpTransport`. Accepts an optional `UdpTransport` in its constructor for injection.
+- **`UdpTransport`** — raw UDP socket layer (`ext-sockets`). Handles `open()`, `send()`, `receive()`, `close()`. No BEP 15 knowledge.
 - **`src/Request/`** — `AnnounceRequest` and `ScrapeRequest`, both `readonly`.
 - **`src/Response/`** — `AnnounceResponse`, `ScrapeResponse`, `PeerInfo`, `TorrentStats`, all `readonly`.
 - **`src/Enum/AnnounceEvent`** — `Started`, `Stopped`, `Completed`, `Empty`.
 - **`src/Enum/TrackerProtocol`** — `Http`, `Udp`.
-- **`src/Exception/`** — `TrackerException` (base, extends `\RuntimeException`) with subclasses: `ConnectionException`, `InvalidResponseException`, `TimeoutException`.
+- **`TrackerClientInterface`** — internal interface implemented by both clients, used to type `TrackerClient::$client` properly. Not intended as a public extension point.
 
 ---
 
@@ -54,7 +56,7 @@ $response = $client->announce(new AnnounceRequest(
     uploaded: 0,
     downloaded: 0,
     left: 1000,
-    event: AnnounceEvent::Started,
+    event: AnnounceEvent::STARTED,
 ));
 
 // Scrape from a UDP tracker
@@ -71,8 +73,9 @@ foreach ($response->torrents as $hash => $stats) {
 
 - **Readonly DTOs** — all request/response objects are `readonly`, constructed once, never mutated
 - **Auto-detection** — `TrackerClient` inspects the URL scheme to pick `HttpTrackerClient` or `UdpTrackerClient` transparently
-- **No interface over-engineering** — HTTP and UDP clients are internal implementation details, not part of the public API
+- **No public extension interface** — `TrackerClientInterface` is internal. HTTP and UDP clients are not meant to be extended by consumers.
 - **Single responsibility** — `TrackerClient` only routes; each client only handles its own protocol
+- **Transport interface** — `UdpTransportInterface` decouples the UDP protocol logic from raw socket I/O, enabling full unit test coverage of `UdpTrackerClient` without real sockets
 
 ---
 
@@ -82,8 +85,12 @@ foreach ($response->torrents as $hash => $stats) {
 src/
 ├── TrackerClient.php              Entry point — protocol detection + delegation
 ├── Client/
+│   ├── TrackerClientInterface.php Internal interface for both clients
 │   ├── HttpTrackerClient.php      BEP 3 + BEP 48 — HTTP announce & scrape
-│   └── UdpTrackerClient.php       BEP 15 — UDP connect/announce/scrape
+│   └── UdpTrackerClient.php       BEP 15 — protocol logic only (no socket calls)
+└── Transport/
+    ├── UdpTransportInterface.php  Interface for UDP socket I/O (enables mocking in tests)
+    └── UdpTransport.php           Raw UDP socket I/O (open/send/receive/close)
 ├── Enum/
 │   ├── AnnounceEvent.php          Started | Stopped | Completed | Empty
 │   └── TrackerProtocol.php        Http | Udp
