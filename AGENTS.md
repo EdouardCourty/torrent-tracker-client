@@ -30,11 +30,11 @@ src/Exception/         → TrackerException hierarchy
 
 - **`TrackerClient`** — public entry point. Parses the tracker URL, detects the protocol, instantiates and calls the appropriate client.
 - **`HttpTrackerClient`** — implements `TrackerClientInterface`. HTTP tracker announce (BEP 3) and scrape (BEP 48) via `symfony/http-client`. Accepts an optional `HttpClientInterface` in its constructor for injection.
-- **`UdpTrackerClient`** — implements `TrackerClientInterface`. Pure BEP 15 protocol logic: connect handshake, announce, scrape packet building and parsing. Delegates all socket I/O to `UdpTransport`. Accepts an optional `UdpTransport` in its constructor for injection.
+- **`UdpTrackerClient`** — implements `TrackerClientInterface`. Pure BEP 15 protocol logic: connect handshake, announce, scrape packet building and parsing. Delegates all socket I/O to `UdpTransport`. Accepts an optional `UdpTransportInterface` in its constructor for injection.
 - **`UdpTransport`** — raw UDP socket layer (`ext-sockets`). Handles `open()`, `send()`, `receive()`, `close()`. No BEP 15 knowledge.
 - **`src/Request/`** — `AnnounceRequest` and `ScrapeRequest`, both `readonly`.
 - **`src/Response/`** — `AnnounceResponse`, `ScrapeResponse`, `PeerInfo`, `TorrentStats`, all `readonly`.
-- **`src/Enum/AnnounceEvent`** — `Started`, `Stopped`, `Completed`, `Empty`.
+- **`src/Enum/AnnounceEvent`** — `STARTED`, `STOPPED`, `COMPLETED`, `EMPTY`.
 - **`src/Enum/TrackerProtocol`** — `Http`, `Udp`.
 - **`TrackerClientInterface`** — internal interface implemented by both clients, used to type `TrackerClient::$client` properly. Not intended as a public extension point.
 
@@ -61,7 +61,7 @@ $response = $client->announce(new AnnounceRequest(
 
 // Scrape from a UDP tracker
 $client = new TrackerClient('udp://tracker.openbittorrent.com:6969');
-$response = $client->scrape(['<info_hash_1>', '<info_hash_2>']);
+$response = $client->scrape(new ScrapeRequest(infoHashes: ['<info_hash_1>', '<info_hash_2>']));
 foreach ($response->torrents as $hash => $stats) {
     echo "{$hash}: {$stats->seeders} seeders, {$stats->leechers} leechers\n";
 }
@@ -88,25 +88,41 @@ src/
 │   ├── TrackerClientInterface.php Internal interface for both clients
 │   ├── HttpTrackerClient.php      BEP 3 + BEP 48 — HTTP announce & scrape
 │   └── UdpTrackerClient.php       BEP 15 — protocol logic only (no socket calls)
-└── Transport/
-    ├── UdpTransportInterface.php  Interface for UDP socket I/O (enables mocking in tests)
-    └── UdpTransport.php           Raw UDP socket I/O (open/send/receive/close)
+├── Transport/
+│   ├── UdpTransportInterface.php  Interface for UDP socket I/O (enables mocking in tests)
+│   └── UdpTransport.php           Raw UDP socket I/O (open/send/receive/close)
 ├── Enum/
-│   ├── AnnounceEvent.php          Started | Stopped | Completed | Empty
+│   ├── AnnounceEvent.php          STARTED | STOPPED | COMPLETED | EMPTY
 │   └── TrackerProtocol.php        Http | Udp
 ├── Request/
 │   ├── AnnounceRequest.php        info_hash, peer_id, port, uploaded, downloaded, left, event
 │   └── ScrapeRequest.php          info_hashes[]
 ├── Response/
 │   ├── AnnounceResponse.php       interval, peers[], warning?
-│   ├── ScrapeResponse.php         TorrentStats[] indexed by info_hash
-│   ├── PeerInfo.php               ip, port, peer_id?
-│   └── TorrentStats.php           seeders, leechers, downloaded
+│   ├── ScrapeResponse.php         TorrentStats[] indexed by info_hash (hex)
+│   ├── PeerInfo.php               ip, port
+│   └── TorrentStats.php           seeders, leechers, completed
 └── Exception/
     ├── TrackerException.php       Base exception (extends RuntimeException)
-    ├── ConnectionException.php    Socket/HTTP connection failure
+    ├── ConnectionException.php    Socket/HTTP connection failure (previous set for HTTP errors)
     ├── InvalidResponseException.php Malformed or unexpected response
     └── TimeoutException.php       Request timed out
+
+tests/
+├── Unit/                          Mock-based tests — no real network
+│   ├── Client/
+│   │   ├── HttpTrackerClientParsingTest.php
+│   │   └── UdpTrackerClientTest.php
+│   ├── Enum/
+│   ├── Exception/
+│   ├── Facade/
+│   ├── Request/
+│   ├── Response/
+│   └── Transport/
+│       └── UdpTransportTest.php   Timeout validation (no socket)
+└── Functional/                    Require Docker (docker compose up -d)
+    ├── OpentrackerFunctionalTest.php  HTTP + UDP against opentracker
+    └── UdpTransportFunctionalTest.php Raw socket layer against opentracker
 ```
 
 **IMPORTANT**: This section should evolve with the project. When a new feature is created, updated or removed, this section should too.
@@ -115,11 +131,17 @@ src/
 
 ## 🧪 Testing
 
-Tests live in `tests/Unit/`. Run tests: `composer test`.
+Tests live in `tests/Unit/` (mock-based, no network) and `tests/Functional/` (requires Docker).
+
+```bash
+composer test              # unit tests only
+composer test:functional   # functional tests (requires: docker compose up -d)
+composer test:all          # all tests
+```
 
 When adding a new feature:
-1. Add or update the relevant test in `tests/Unit/`
-2. Use mocking for HTTP responses and UDP sockets — never hit real trackers in tests
+1. Add or update the relevant unit test in `tests/Unit/` — mock HTTP responses and UDP transport, never hit real trackers
+2. If the feature involves real network behaviour (new protocol field, edge case against a live tracker), add or extend the functional tests in `tests/Functional/`
 
 ---
 
@@ -141,7 +163,7 @@ When adding a new feature:
 - **UDP binary packing** — use `pack()`/`unpack()` with explicit format strings. Document the format string against the BEP spec.
 - **Bencode decoding** — use `arokettu/bencode` for HTTP responses, never hand-roll a bencode parser.
 - **info_hash encoding** — info_hashes are 20-byte binary strings; URL-encode them with `rawurlencode()` for HTTP, send raw for UDP.
-- **Timeouts** — always apply timeouts to both HTTP (`stream_context_create`) and UDP (socket options). Default: 5 seconds.
+- **Timeouts** — always apply timeouts to both HTTP (Symfony `timeout` option) and UDP (`socket_select`). Default: 5 seconds.
 - **`readonly` everywhere** — all DTOs (Request and Response) must be `readonly` classes.
 
 ## 📚 References

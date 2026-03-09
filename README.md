@@ -2,6 +2,17 @@
 
 A modern PHP 8.3+ library for communicating with BitTorrent trackers over **HTTP** (BEP 3) and **UDP** (BEP 15), supporting both **announce** and **scrape** operations.
 
+## Table of Contents
+
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Basic usage](#basic-usage)
+  - [Injecting a custom HTTP client](#injecting-a-custom-http-client)
+  - [Direct client usage](#direct-client-usage)
+- [Exceptions](#exceptions)
+- [BEP references](#bep-references)
+
 ## Requirements
 
 - PHP 8.3+
@@ -85,10 +96,10 @@ $udp  = new UdpTrackerClient('udp://tracker.opentrackr.org:1337/announce', timeo
 
 All exceptions extend `Ecourty\TorrentTrackerClient\Exception\TrackerException` (itself extending `\RuntimeException`):
 
-| Exception | When |
-|---|---|
-| `ConnectionException` | Cannot connect to the tracker |
-| `TimeoutException` | Request timed out |
+| Exception                  | When                          |
+|----------------------------|-------------------------------|
+| `ConnectionException`      | Cannot connect to the tracker |
+| `TimeoutException`         | Request timed out             |
 | `InvalidResponseException` | Malformed or failure response |
 
 ```php
