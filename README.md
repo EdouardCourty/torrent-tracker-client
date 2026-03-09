@@ -1,5 +1,7 @@
 # torrent-tracker-client
 
+[![PHP CI](https://github.com/EdouardCourty/torrent-tracker-client/actions/workflows/ci.yml/badge.svg)](https://github.com/EdouardCourty/torrent-tracker-client/actions/workflows/ci.yml)
+
 A modern PHP 8.3+ library for communicating with BitTorrent trackers over **HTTP** (BEP 3) and **UDP** (BEP 15), supporting both **announce** and **scrape** operations.
 
 ## Table of Contents
