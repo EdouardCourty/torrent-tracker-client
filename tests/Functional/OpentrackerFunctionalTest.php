@@ -10,8 +10,6 @@ use Ecourty\TorrentTrackerClient\Exception\TimeoutException;
 use Ecourty\TorrentTrackerClient\Exception\TrackerException;
 use Ecourty\TorrentTrackerClient\Request\AnnounceRequest;
 use Ecourty\TorrentTrackerClient\Request\ScrapeRequest;
-use Ecourty\TorrentTrackerClient\Response\AnnounceResponse;
-use Ecourty\TorrentTrackerClient\Response\ScrapeResponse;
 use Ecourty\TorrentTrackerClient\TrackerClient;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
